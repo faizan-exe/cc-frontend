@@ -49,12 +49,20 @@ const Home = () => {
       // Generate the URL
       const generateUrlResponse = await axios.post(`${API_BASE_URL}/generateUrl`, {
         file_name: file.name, // Send file_name in the body
+        user_id: userId
       });
 
-      const uploadUrl = generateUrlResponse.data.url;
+      console.log(file.name);
+      console.log(file.type);
+      
+
+      console.log(generateUrlResponse.data);
+      
+
+      const uploadUrl = generateUrlResponse.data.signedUrl;
 
       // Upload the file
-      await axios.put(uploadUrl, file, {
+      await axios.put(uploadUrl, {file}, {
         headers: {
           'Content-Type': file.type,
         },
@@ -113,7 +121,7 @@ const Home = () => {
 
         <h2 className="mt-6 text-xl font-semibold">Your Videos</h2>
         <div className="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-2">
-          {videos.map((video) => (
+          {videos.length > 0 ? videos.map((video) => (
             <div key={video.id} className="p-4 bg-white shadow rounded">
               <p className="text-sm font-medium">{video.name}</p>
               <button
@@ -129,7 +137,7 @@ const Home = () => {
                 Delete
               </button>
             </div>
-          ))}
+          )) : <p>No videos Uploaded</p> }
         </div>
       </div>
 

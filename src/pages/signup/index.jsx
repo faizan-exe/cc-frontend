@@ -36,7 +36,7 @@ function Signup() {
         // Second API call for creating storage bucket
         try {
           const storageBucketCreate = await axios.post(
-            'https://storage-service-180924265462.us-central1.run.app/',
+            'https://storage-service-180924265462.us-central1.run.app/api/storage',
             {
               name: formData.username,
               user_id: response.data.id,
