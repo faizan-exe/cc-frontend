@@ -34,15 +34,21 @@ const Home = () => {
   // Fetch videos from backend
   const fetchVideos = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/videos`);
+      const response = await axios.get(`${API_BASE_URL}/videos`, {
+        params: {
+          user_id: userId, // Add userId as a query parameter
+        },
+      });
+  
       setVideos(response.data);
     } catch (err) {
       console.error('Error fetching videos:', err);
     }
   };
-
+  
   // Handle file upload
   const handleFileUpload = async () => {
+    console.log("hellooo")
     if (!file) return;
 
     try {
@@ -60,11 +66,12 @@ const Home = () => {
       
 
       const uploadUrl = generateUrlResponse.data.signedUrl;
+      console.log("file=======", file)
 
       // Upload the file
-      await axios.put(uploadUrl, {file}, {
+      await axios.put(uploadUrl, file, {
         headers: {
-          'Content-Type': file.type,
+          'Content-Type': 'application/octet-stream',
         },
       });
 
