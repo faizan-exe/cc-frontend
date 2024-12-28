@@ -14,6 +14,7 @@ const Home = () => {
   // Configure Axios interceptor to add user_id header
   useEffect(() => {
     const token = localStorage.getItem('token');
+  
     if (token) {
       const decoded = jwtDecode(token);
       setUsername(decoded.username);
@@ -27,12 +28,23 @@ const Home = () => {
         return config;
       });
 
-      fetchVideos(); // Fetch videos without explicitly passing user_id
     }
   }, []);
 
+  useEffect(() => {
+    
+    if (userId) {
+      fetchVideos();
+    }
+
+  }, [userId])
+
+
+  console.log("userId=====", userId)
+
   // Fetch videos from backend
   const fetchVideos = async () => {
+  console.log("userId", userId)
     try {
       const response = await axios.get(`${API_BASE_URL}/videos`, {
         params: {
@@ -40,11 +52,13 @@ const Home = () => {
         },
       });
   
-      setVideos(response.data);
+      setVideos(response.data.videos);
     } catch (err) {
       console.error('Error fetching videos:', err);
     }
   };
+
+  console.log("videos====",videos)
   
   // Handle file upload
   const handleFileUpload = async () => {
@@ -105,6 +119,14 @@ const Home = () => {
     setSelectedVideo(null);
   };
 
+  const extractVideoName = (url) => {
+    const path = url.split('/o/')[1]; // Get everything after '/o/'
+    const videoName = path.split('?')[0]; // Remove the query parameters
+    return videoName;
+  };
+
+  videos.map((video) =>  console.log("video====", video))
+
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-4xl mx-auto py-8">
@@ -130,15 +152,15 @@ const Home = () => {
         <div className="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-2">
           {videos.length > 0 ? videos.map((video) => (
             <div key={video.id} className="p-4 bg-white shadow rounded">
-              <p className="text-sm font-medium">{video.name}</p>
+              <p className="text-sm font-medium">{extractVideoName(video)}</p>
               <button
-                onClick={() => openModal(video.url)}
+                onClick={() => openModal(video)}
                 className="mt-2 text-blue-600 hover:underline"
               >
                 Play
               </button>
               <button
-                onClick={() => handleDeleteVideo(video.name)}
+                onClick={() => handleDeleteVideo(extractVideoName(video))}
                 className="ml-2 text-red-600 hover:underline"
               >
                 Delete
