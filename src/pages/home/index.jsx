@@ -42,6 +42,8 @@ const Home = () => {
 
       const videoList = response.data.videos;
       setVideos(videoList);
+      // console.log(videoList);
+      
 
       const totalUsed = videoList.reduce(
         (acc, video) => acc + parseInt(video.size || 0),
@@ -58,47 +60,65 @@ const Home = () => {
       alert('Please select a file to upload.');
       return;
     }
-
-    const fileSizeMB = file.size / (1024 * 1024); // Convert size to MB
-    const totalUsedAfterUpload = usedStorage + fileSizeMB;
-
-    if (totalUsedAfterUpload > MAX_STORAGE_LIMIT_MB) {
-      alert(
-        'Uploading this video would exceed your storage limit. Delete some videos to upload more.'
-      );
-      return;
-    }
-
-    if (totalUsedAfterUpload > MAX_STORAGE_LIMIT_MB * 0.8) {
-      alert(
-        'You are using more than 80% of your storage limit. Consider managing your files.'
-      );
-    }
-
+  
     setLoading(true);
     try {
+      // Check upload limit with the backend
+      const monitorResponse = await axios.post('http://localhost:3000/api/monitor', {
+        videoSize: file.size / (1024 * 1024),
+        userId
+      });
+  
+      const { canUpload, remainingStorage, remainingBandWith } = monitorResponse.data;
+
+      console.log(monitorResponse.data.message);
+      
+      if (!canUpload) {
+        const formattedRemainingBandwidth = remainingBandWith.toFixed(2); // Formats to 2 decimal places
+        alert(monitorResponse.data.message + " Your remaining bandwidth for today is " + formattedRemainingBandwidth + "MB.");
+        return;
+      }
+  
+      const fileSizeMB = file.size / (1024 * 1024); // Convert file size to MB
+      if (fileSizeMB > remainingStorage) {
+        alert(
+          `This file exceeds your remaining storage limit of ${remainingStorage} MB.`
+        );
+        return;
+      }
+  
+      // Generate upload URL
       const generateUrlResponse = await axios.post(`${API_BASE_URL}/generateUrl`, {
         file_name: file.name,
         user_id: userId,
-        username: username, // Send username in the body
+        username: username,
       });
-
+  
       const uploadUrl = generateUrlResponse.data.signedUrl;
-
+  
+      // Upload the file
       await axios.put(uploadUrl, file, {
         headers: {
           'Content-Type': 'application/octet-stream',
         },
       });
-
+  
       alert('Video uploaded successfully!');
-      fetchVideos(); // Refresh the video list
+  
+      // Log the upload in the database
+      await axios.get(`http://localhost:3000/api/monitor/${userId}/${file.size / (1024 * 1024)}`);
+  
+      // Refresh the video list
+      fetchVideos();
     } catch (err) {
       console.error('Error uploading video:', err);
+      alert('Error occurred during upload. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+  
+  
 
   const handleDeleteVideo = async (fileName) => {
     try {
