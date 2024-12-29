@@ -40,10 +40,11 @@ function Signup() {
             {
               name: formData.username,
               user_id: response.data.id,
-            }
+              username : formData.username
+            },
           );
   
-          if (storageBucketCreate.status == 200) {
+          if (storageBucketCreate.status === 200) {
             console.log('Bucket Created!!!');
           }
         } catch (storageError) {
@@ -59,6 +60,7 @@ function Signup() {
       setError(errorMessage);
     }
   };
+  
   
 
   return (

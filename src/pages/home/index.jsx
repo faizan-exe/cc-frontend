@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { jwtDecode } from 'jwt-decode';
+import jwtDecode from 'jwt-decode';
 
 const Home = () => {
   const [username, setUsername] = useState('');
@@ -8,81 +8,72 @@ const Home = () => {
   const [videos, setVideos] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [file, setFile] = useState(null);
+  const [usedStorage, setUsedStorage] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   const API_BASE_URL = 'https://storage-service-180924265462.us-central1.run.app/api/storage';
+  const MAX_STORAGE_LIMIT_MB = 50;
 
-  // Configure Axios interceptor to add user_id header
   useEffect(() => {
     const token = localStorage.getItem('token');
-  
     if (token) {
       const decoded = jwtDecode(token);
       setUsername(decoded.username);
       setUserId(decoded.sub);
-
-      // Add Axios request interceptor
-      axios.interceptors.request.use((config) => {
-        if (decoded.sub) {
-          config.headers['user_id'] = decoded.sub; // Add user_id in headers
-        }
-        return config;
-      });
-
     }
   }, []);
 
   useEffect(() => {
-    
     if (userId) {
       fetchVideos();
     }
+  }, [userId]);
 
-  }, [userId])
-
-
-  console.log("userId=====", userId)
-
-  // Fetch videos from backend
   const fetchVideos = async () => {
-  console.log("userId", userId)
     try {
-      const response = await axios.get(`${API_BASE_URL}/videos`, {
-        params: {
-          user_id: userId, // Add userId as a query parameter
-        },
+      const response = await axios.post(`${API_BASE_URL}/videos`, {
+        user_id: userId,
+        username: username, // Send username in the body
       });
-  
-      setVideos(response.data.videos);
+
+      const videoList = response.data.videos;
+      setVideos(videoList);
+
+      const totalUsed = videoList.reduce((acc, video) => acc + parseInt(video.size || 0), 0);
+      setUsedStorage(totalUsed / (1024 * 1024)); // Convert to MB
     } catch (err) {
       console.error('Error fetching videos:', err);
     }
   };
 
-  console.log("videos====",videos)
-  
-  // Handle file upload
   const handleFileUpload = async () => {
-    console.log("hellooo")
-    if (!file) return;
+    if (!file) {
+      alert('Please select a file to upload.');
+      return;
+    }
 
+    const fileSizeMB = file.size / (1024 * 1024); // Convert size to MB
+    const totalUsedAfterUpload = usedStorage + fileSizeMB;
+
+    if (totalUsedAfterUpload > MAX_STORAGE_LIMIT_MB) {
+      alert('Uploading this video would exceed your storage limit. Delete some videos to upload more.');
+      return;
+    }
+
+    if (totalUsedAfterUpload > MAX_STORAGE_LIMIT_MB * 0.8) {
+      alert('You are using more than 80% of your storage limit. Consider managing your files.');
+    }
+
+    setLoading(true);
     try {
-      // Generate the URL
       const generateUrlResponse = await axios.post(`${API_BASE_URL}/generateUrl`, {
-        file_name: file.name, // Send file_name in the body
-        user_id: userId
+        file_name: file.name,
+        user_id: userId,
+        username: username, // Send username in the body
       });
 
-      console.log(file.name);
-      console.log(file.type);
-      
-
-      console.log(generateUrlResponse.data);
-      
-
       const uploadUrl = generateUrlResponse.data.signedUrl;
-      console.log("file=======", file)
 
-      // Upload the file
       await axios.put(uploadUrl, file, {
         headers: {
           'Content-Type': 'application/octet-stream',
@@ -90,47 +81,66 @@ const Home = () => {
       });
 
       alert('Video uploaded successfully!');
-      fetchVideos(); // Refresh video list
+      fetchVideos(); // Refresh the video list
     } catch (err) {
       console.error('Error uploading video:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Delete video
   const handleDeleteVideo = async (fileName) => {
     try {
-      await axios.delete(`${API_BASE_URL}/videos`, {
-        data: { file_name: fileName }, // Send file_name in the body
+      await axios.post(`${API_BASE_URL}/videos/delete`, {
+        file_name: fileName,
+        user_id: userId,
+        username: username, // Send username in the body
       });
       alert('Video deleted successfully!');
-      fetchVideos(); // Refresh video list
+      fetchVideos();
     } catch (err) {
       console.error('Error deleting video:', err);
     }
   };
 
-  // Open modal to play video
   const openModal = (videoUrl) => {
     setSelectedVideo(videoUrl);
   };
 
-  // Close modal
   const closeModal = () => {
     setSelectedVideo(null);
   };
 
   const extractVideoName = (url) => {
-    const path = url.split('/o/')[1]; // Get everything after '/o/'
-    const videoName = path.split('?')[0]; // Remove the query parameters
-    return videoName;
+    try {
+      const path = url.split('/o/')[1];
+      const videoName = path.split('?')[0];
+      return decodeURIComponent(videoName);
+    } catch (error) {
+      console.error('Error extracting video name:', error);
+      return 'Unknown Video';
+    }
   };
 
-  videos.map((video) =>  console.log("video====", video))
+  const storagePercentage = (usedStorage / MAX_STORAGE_LIMIT_MB) * 100;
 
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-4xl mx-auto py-8">
         <h1 className="text-2xl font-bold">Welcome, {username}</h1>
+        <div className="mt-4">
+          <p>Used Storage: {usedStorage.toFixed(2)} MB / {MAX_STORAGE_LIMIT_MB} MB</p>
+
+          {/* Progress Bar */}
+          <div className="w-full bg-gray-300 rounded h-4 mt-2">
+            <div
+              className={`h-4 rounded ${
+                storagePercentage >= 80 ? 'bg-red-500' : 'bg-indigo-600'
+              }`}
+              style={{ width: `${Math.min(storagePercentage, 100)}%` }}
+            ></div>
+          </div>
+        </div>
 
         <div className="mt-4">
           <label className="block text-sm font-medium text-gray-700">Upload Video</label>
@@ -148,29 +158,38 @@ const Home = () => {
           </button>
         </div>
 
+        {loading && (
+          <div className="mt-4 text-center">
+            <p className="text-indigo-600 font-semibold">Uploading your video...</p>
+          </div>
+        )}
+
         <h2 className="mt-6 text-xl font-semibold">Your Videos</h2>
         <div className="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-2">
-          {videos.length > 0 ? videos.map((video) => (
-            <div key={video.id} className="p-4 bg-white shadow rounded">
-              <p className="text-sm font-medium">{extractVideoName(video)}</p>
-              <button
-                onClick={() => openModal(video)}
-                className="mt-2 text-blue-600 hover:underline"
-              >
-                Play
-              </button>
-              <button
-                onClick={() => handleDeleteVideo(extractVideoName(video))}
-                className="ml-2 text-red-600 hover:underline"
-              >
-                Delete
-              </button>
-            </div>
-          )) : <p>No videos Uploaded</p> }
+          {videos.length > 0 ? (
+            videos.map((video) => (
+              <div key={video.id} className="p-4 bg-white shadow rounded">
+                <p className="text-sm font-medium">{extractVideoName(video.url)}</p>
+                <button
+                  onClick={() => openModal(video.url)}
+                  className="mt-2 text-blue-600 hover:underline"
+                >
+                  Play
+                </button>
+                <button
+                  onClick={() => handleDeleteVideo(extractVideoName(video.url))}
+                  className="ml-2 text-red-600 hover:underline"
+                >
+                  Delete
+                </button>
+              </div>
+            ))
+          ) : (
+            <p>No videos Uploaded</p>
+          )}
         </div>
       </div>
 
-      {/* Modal */}
       {selectedVideo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="relative bg-white rounded-lg shadow-lg max-w-md w-full p-4">
