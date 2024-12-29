@@ -64,7 +64,7 @@ const Home = () => {
     setLoading(true);
     try {
       // Check upload limit with the backend
-      const monitorResponse = await axios.post('http://localhost:3000/api/monitor', {
+      const monitorResponse = await axios.post('https://monitor-serv-180924265462.us-central1.run.app/api/monitor', {
         videoSize: file.size / (1024 * 1024),
         userId
       });
@@ -106,7 +106,7 @@ const Home = () => {
       alert('Video uploaded successfully!');
   
       // Log the upload in the database
-      await axios.get(`http://localhost:3000/api/monitor/${userId}/${file.size / (1024 * 1024)}`);
+      await axios.get(`https://monitor-serv-180924265462.us-central1.run.app/api/monitor/${userId}/${file.size / (1024 * 1024)}`);
   
       // Refresh the video list
       fetchVideos();
